@@ -1,0 +1,45 @@
+{{- if $.Values.server.jobs }}
+{{- range $job := $.Values.server.jobs -}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-%s" $job.name (randAlphaNum 5 | nospace | lower ) }}
+  labels:
+    {{- include "base-service.labels" (dict "context" $ "component" $.Values.server.name "name" $.Values.server.name) | nindent 4 }}
+  annotations:
+    {{- with $job.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  backoffLimit: {{ $job.backoffLimit | default 1 }}
+  parallelism: {{ $job.parallelism | default 1 }}
+  template:
+    spec:
+      restartPolicy: {{ $job.restartPolicy | default "Never" }}
+      containers:
+        - name: {{ $job.name }}
+          image: {{ include "merged.image" (merge ($job.image|default dict) $.Values.server.image) }}
+          imagePullPolicy: {{ $.Values.server.image.pullPolicy }}
+          command:
+            {{- range $job.commands }}
+            - {{ . }}
+            {{- end }}
+          {{ if $job.resources }}
+          resources:
+            {{- toYaml $job.resources | nindent 10 }}
+          {{- end }}
+          {{ if $job.env }}
+          env:
+            {{- include "merged.env" (concat $.Values.server.env ($job.env | default list)) | nindent 10 }}
+          {{- end }}
+          {{- if .Values.server.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.server.volumeMounts | nindent 12 }}
+          {{- end }}
+      {{- if .Values.server.volumes }}
+      volumes:
+        {{- toYaml .Values.server.volumes | nindent 8 }}
+      {{- end }}
+{{ end }}
+{{ end }}
